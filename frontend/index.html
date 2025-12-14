@@ -5,22 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>EOEX AI Travel Agent</title>
     <link rel="stylesheet" href="./assets/css/styles.css" />
+    <link rel="icon" href="assets/img/favicon.ico" type="image/x-icon" />
   </head>
   <body>
-    <header>
-      <h1>EOEX AI Travel Agent</h1>
-    </header>
-    <main>
-      <section id="search">
-        <h2>Plan Your Journey</h2>
-        <form id="search-form">
-          <label>Origin <input type="text" id="origin" value="MAD" /></label>
-          <label>Destination <input type="text" id="destination" value="ATH" /></label>
-          <label>Departure Date <input type="date" id="date" value="2024-11-01" /></label>
-          <button type="submit">Search Flights</button>
-        </form>
+    <div class="hero">
+      <div class="overlay"></div>
+      <div class="content">
+        <h1>EOEX AI Travel Agent</h1>
+        <p>Plan premium journeys with live flight offers.</p>
+      </div>
+    </div>
+    <main class="container">
+      <section class="card">
+        <h2>Choose Destination</h2>
+        <div class="grid">
+          <div>
+            <label for="continent">Continent</label>
+            <select id="continent"></select>
+          </div>
+          <div>
+            <label for="country">Country</label>
+            <select id="country"></select>
+          </div>
+          <div>
+            <label for="capital">Capital City</label>
+            <select id="capital"></select>
+          </div>
+        </div>
+        <button id="findFlights" class="primary">Find Flights from Paris</button>
       </section>
-      <section id="results"></section>
+
+      <section class="card">
+        <h2>Flight Offers</h2>
+        <div id="offers" class="offers"></div>
+      </section>
     </main>
     <script src="./assets/js/app.js"></script>
   </body>

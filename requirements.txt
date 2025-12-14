@@ -1,7 +1,7 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
-mysqlclient
+pymysql
 alembic
 pydantic
 python-dotenv
@@ -11,3 +11,4 @@ pytest
 pytest-cov
 flake8
 black
+httpx
