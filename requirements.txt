@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+mysqlclient
+alembic
+pydantic
+python-dotenv
+amadeus
+requests
+pytest
+pytest-cov
+flake8
+black
