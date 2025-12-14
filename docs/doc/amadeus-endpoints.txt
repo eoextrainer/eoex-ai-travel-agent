@@ -1,0 +1,9 @@
+# Amadeus Supported Endpoints (subset)
+- GET /v2/shopping/flight-offers
+- POST /v1/shopping/flight-offers/pricing
+- GET /v2/reference-data/urls/checkin-links
+- GET /v2/shopping/hotel-offers
+- GET /v1/reference-data/locations
+- GET /v1/security/oauth2/token
+
+Refer to https://developers.amadeus.com/ for full list.

@@ -1,0 +1,7 @@
+# EOEX Web Apps API Keys
+
+Set environment variables before running:
+- AMADEUS_CLIENT_ID=<your_client_id>
+- AMADEUS_CLIENT_SECRET=<your_client_secret>
+
+Never commit secrets to the repository. Use `.env` locally or Codespaces/CI secrets.

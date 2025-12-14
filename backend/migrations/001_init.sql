@@ -80,6 +80,28 @@ CREATE TABLE IF NOT EXISTS places_to_visit (
   FOREIGN KEY (journey_id) REFERENCES journeys(id)
 );
 
+-- Geography seed tables
+CREATE TABLE IF NOT EXISTS continents (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(64) UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS countries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  continent_id INT NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  UNIQUE KEY uniq_country (continent_id, name),
+  FOREIGN KEY (continent_id) REFERENCES continents(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS capitals (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  country_id INT NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  UNIQUE KEY uniq_capital (country_id, name),
+  FOREIGN KEY (country_id) REFERENCES countries(id) ON DELETE CASCADE
+);
+
 INSERT INTO users (first_name, surname, date_of_birth, current_location, current_budget, travel_preferences, travel_companions, special_travel_needs, username, role)
 VALUES ('Default', 'Traveler', '1990-01-01', 'Madrid', 2000.00, 'personal', 'none', NULL, 'traveler-1', 'user')
 ON DUPLICATE KEY UPDATE username=VALUES(username);
