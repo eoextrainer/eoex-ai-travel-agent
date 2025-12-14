@@ -1,0 +1,17 @@
+DIST/
+__pycache__/
+.env
+.venv/
+venv/
+*.pyc
+*.pyo
+*.log
+node_modules/
+.env.local
+.idea/
+.vscode/
+coverage/
+htmlcov/
+.mypy_cache/
+.cache/
+pytest.cache/

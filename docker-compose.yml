@@ -1,0 +1,31 @@
+version: "3.8"
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: eoex_travel
+      MYSQL_USER: eoex
+      MYSQL_PASSWORD: eoex
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+  app:
+    build: .
+    environment:
+      AMADEUS_CLIENT_ID: ${AMADEUS_CLIENT_ID}
+      AMADEUS_CLIENT_SECRET: ${AMADEUS_CLIENT_SECRET}
+      MYSQL_USER: eoex
+      MYSQL_PASSWORD: eoex
+      MYSQL_HOST: db
+      MYSQL_DB: eoex_travel
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+volumes:
+  db_data:
