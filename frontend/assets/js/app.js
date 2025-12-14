@@ -4,10 +4,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const countrySel = document.getElementById('country');
   const capitalSel = document.getElementById('capital');
   const offersDiv = document.getElementById('offers');
+  const container = document.querySelector('.container') || document.body;
+  // Simple wiring test: display a small sample from backend DB
+  const wiringCard = document.createElement('section'); wiringCard.className = 'card';
+  wiringCard.innerHTML = `<h2>Backend Data Snapshot</h2><pre id="geoDump" style="max-height:200px; overflow:auto; background:#0b1324; color:#d7e3ff; padding:12px; border-radius:8px;"></pre>`;
+  container.prepend(wiringCard);
   
   // If the new UI elements are missing, create them dynamically to ensure functionality
   if (!continentSel || !countrySel || !capitalSel) {
-    const container = document.querySelector('.container') || document.body;
     const section = document.createElement('section'); section.className = 'card';
     section.innerHTML = `
       <h2>Choose Destination</h2>
@@ -35,6 +39,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const _capitalSel = document.getElementById('capital');
   const _offersDiv = document.getElementById('offers') || (() => { const d = document.createElement('div'); d.id='offers'; d.className='offers'; (document.querySelector('.container')||document.body).appendChild(d); return d; })();
   continentSel = _continentSel; countrySel = _countrySel; capitalSel = _capitalSel; offersDiv = _offersDiv;
+
+  // Load geo dump to verify wiring
+  (async () => {
+    const dumpEl = document.getElementById('geoDump');
+    try {
+      const res = await fetch('/api/geo/dump');
+      const json = await res.json();
+      const preview = {
+        continents: json.continents.map(c => c.name).slice(0, 7),
+        countries: json.countries.map(c => c.name).slice(0, 10),
+        capitals: json.capitals.map(c => c.name).slice(0, 10),
+        counts: {
+          continents: json.continents.length,
+          countries: json.countries.length,
+          capitals: json.capitals.length
+        }
+      };
+      dumpEl.textContent = JSON.stringify(preview, null, 2);
+    } catch (e) {
+      dumpEl.textContent = 'Failed to fetch /api/geo/dump: ' + e;
+    }
+  })();
 
   async function loadContinents() {
     try {

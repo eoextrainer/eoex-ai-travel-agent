@@ -31,9 +31,55 @@ CACHE_DEFAULT_TTL=600
 ## Serve Frontend
 Visit `http://localhost:8000/index.html` to load the frontend via FastAPI static files.
 
+## Geo Data Seeding & Verification
+
+Seed and inspect continents, countries, and capitals:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/geo/seed
+curl -s http://127.0.0.1:8000/api/geo/dump | jq '.counts,.continents,.countries[:10],.capitals[:10]'
+```
+
+On the homepage, a "Backend Data Snapshot" card will display a small preview fetched from `/api/geo/dump` to validate frontend-backend wiring.
+
 ## Codespaces
 - Open the repo in GitHub Codespaces; `.devcontainer/devcontainer.json` will install dependencies.
 - Run `uvicorn backend.app.main:app --host 0.0.0.0 --port 8000`.
+
+## Local Project Setup
+
+- Virtualenv and dependencies
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+- Environment variables: use `.env` at repo root
+
+```bash
+AMADEUS_CLIENT_ID=<your_client_id>
+AMADEUS_CLIENT_SECRET=<your_client_secret>
+MYSQL_USER=eoex
+MYSQL_PASSWORD=eoex
+MYSQL_HOST=127.0.0.1
+MYSQL_DB=eoex_travel
+CACHE_DEFAULT_TTL=600
+```
+
+- Start MySQL via Docker Compose and apply migrations
+
+```bash
+docker compose up -d db
+bash backend/scripts/init_db.sh
+```
+
+- Start backend
+
+```bash
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
 
 ## Docker Hub Publishing
 1. Build image locally: `docker build -t eoex/eoex-ai-travel-agent:latest .`
@@ -61,6 +107,15 @@ bash backend/scripts/init_db.sh
 ```
 
 Note: On some distros, `mysql.service` may be masked; prefer Docker Compose.
+
+## Tag and Release
+
+```bash
+git add -A
+git commit -m "docs(setup): add compose/devcontainer setup; fix geo seeding; add dump endpoint; frontend wiring card"
+git tag -a v0.2.0 -m "Geo wiring fix and Dockerized setup"
+git push --follow-tags
+```
 
 ## Amadeus API Test
 Run a quick test against Amadeus once env vars are set:
