@@ -42,7 +42,7 @@ def seed_geo():
                 conn.execute(text("INSERT IGNORE INTO countries (continent_id, name) VALUES (:cid, :name)"), {"cid": cid, "name": country})
         # Map country names to ids
         rows = conn.execute(text("SELECT c.id as id, c.name as name FROM countries c")).mappings().all()
-        country_map = {r['name']: r['id']}  # type: ignore
+        country_map = {r['name']: r['id'] for r in rows}  # type: ignore
         # Insert capitals
         for country, capital in SEED_CAPITALS.items():
             cid = country_map.get(country)
@@ -67,3 +67,16 @@ def list_capitals(country: str = Query(...)):
     with engine.connect() as conn:
         rows = conn.execute(text("SELECT cp.name FROM capitals cp JOIN countries c ON c.id = cp.country_id WHERE c.name = :country ORDER BY cp.name"), {"country": country}).mappings().all()
         return [r['name'] for r in rows]
+
+@router.get("/dump")
+def dump_geo():
+    """Return all continents, countries, and capitals for debugging/wiring verification."""
+    with engine.connect() as conn:
+        continents = conn.execute(text("SELECT id, name FROM continents ORDER BY name")).mappings().all()
+        countries = conn.execute(text("SELECT id, continent_id, name FROM countries ORDER BY name")).mappings().all()
+        capitals = conn.execute(text("SELECT id, country_id, name FROM capitals ORDER BY name")).mappings().all()
+        return {
+            "continents": [{"id": c["id"], "name": c["name"]} for c in continents],
+            "countries": [{"id": c["id"], "continent_id": c["continent_id"], "name": c["name"]} for c in countries],
+            "capitals": [{"id": c["id"], "country_id": c["country_id"], "name": c["name"]} for c in capitals],
+        }
