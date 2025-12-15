@@ -83,13 +83,13 @@ CREATE TABLE IF NOT EXISTS places_to_visit (
 -- Geography seed tables
 CREATE TABLE IF NOT EXISTS continents (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(64) UNIQUE NOT NULL
+  name VARCHAR(255) UNIQUE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS countries (
   id INT AUTO_INCREMENT PRIMARY KEY,
   continent_id INT NOT NULL,
-  name VARCHAR(128) NOT NULL,
+  name VARCHAR(255) NOT NULL,
   UNIQUE KEY uniq_country (continent_id, name),
   FOREIGN KEY (continent_id) REFERENCES continents(id) ON DELETE CASCADE
 );
@@ -97,8 +97,17 @@ CREATE TABLE IF NOT EXISTS countries (
 CREATE TABLE IF NOT EXISTS capitals (
   id INT AUTO_INCREMENT PRIMARY KEY,
   country_id INT NOT NULL,
-  name VARCHAR(128) NOT NULL,
+  name VARCHAR(255) NOT NULL,
   UNIQUE KEY uniq_capital (country_id, name),
+  FOREIGN KEY (country_id) REFERENCES countries(id) ON DELETE CASCADE
+);
+
+-- Cities table for storing multiple cities per country
+CREATE TABLE IF NOT EXISTS cities (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  country_id INT NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  UNIQUE KEY uniq_city (country_id, name),
   FOREIGN KEY (country_id) REFERENCES countries(id) ON DELETE CASCADE
 );
 

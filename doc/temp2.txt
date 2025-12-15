@@ -1,0 +1,5 @@
+try the following:
+book a flight from paris to athens on 01-01-2026
+book a flight from athens to madrid on 02-01-2026
+book a flight from madrid to moscow on 03-01-2026
+book a flight from moscow to beijing on 04-01-2026

@@ -21,11 +21,12 @@ services:
       MYSQL_HOST: db
       MYSQL_DB: eoex_travel
     ports:
-      - "8000:8000"
+      - "2000:2000"
     depends_on:
       - db
     volumes:
       - ./backend:/app/backend
       - ./frontend:/app/frontend
+      - ./doc:/app/doc
 volumes:
   db_data:

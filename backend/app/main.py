@@ -24,9 +24,7 @@ app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(amadeus_api.router, prefix="/api/amadeus", tags=["amadeus"])
 app.include_router(geo.router, prefix="/api/geo", tags=["geo"])
 
-@app.get("/")
-def root():
-    return {"message": "EOEX AI Travel Agent API"}
+
 
 # Serve frontend static files
 frontend_dir = Path(__file__).resolve().parents[2] / "frontend"

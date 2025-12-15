@@ -10,6 +10,9 @@ echo "Creating database ${MYSQL_DB} if not exists..."
 mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS ${MYSQL_DB};"
 
 echo "Applying migrations..."
-mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DB" < "$(dirname "$0")/../migrations/001_init.sql"
+for f in $(ls -1 "$(dirname "$0")/../migrations"/*.sql | sort); do
+	echo "Applying $f"
+	mysql -h "$MYSQL_HOST" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DB" < "$f"
+done
 
 echo "Done."

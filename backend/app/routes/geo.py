@@ -1,82 +1,97 @@
 from fastapi import APIRouter, Query
 from sqlalchemy import text
 from ..db import engine
+import os, json, csv
 
 router = APIRouter()
 
-# Static seed data
-SEED_CONTINENTS = ['Africa', 'Asia', 'Europe', 'North America', 'South America', 'Oceania', 'Antarctica']
-SEED_COUNTRIES = {
-    'Europe': ['France', 'Germany', 'Greece', 'Italy', 'Spain', 'United Kingdom'],
-    'Asia': ['Japan', 'China', 'India', 'South Korea', 'Thailand'],
-    'North America': ['United States', 'Canada', 'Mexico'],
-    'South America': ['Brazil', 'Argentina', 'Chile', 'Peru'],
-    'Africa': ['South Africa', 'Nigeria', 'Egypt', 'Kenya'],
-    'Oceania': ['Australia', 'New Zealand'],
-    'Antarctica': []
-}
-SEED_CAPITALS = {
-    'France': 'Paris', 'Germany': 'Berlin', 'Greece': 'Athens', 'Italy': 'Rome', 'Spain': 'Madrid', 'United Kingdom': 'London',
-    'United States': 'Washington, D.C.', 'Canada': 'Ottawa', 'Mexico': 'Mexico City',
-    'Japan': 'Tokyo', 'China': 'Beijing', 'India': 'New Delhi', 'South Korea': 'Seoul', 'Thailand': 'Bangkok',
-    'Brazil': 'Brasília', 'Argentina': 'Buenos Aires', 'Chile': 'Santiago', 'Peru': 'Lima',
-    'South Africa': 'Pretoria', 'Nigeria': 'Abuja', 'Egypt': 'Cairo', 'Kenya': 'Nairobi',
-    'Australia': 'Canberra', 'New Zealand': 'Wellington'
-}
+REGION_FILES = [
+    "africa.json","america.json","asia.json","pacific.json","indian.json",
+    "europe.json","atlantic.json","australia.json","arctic.json"
+]
 
-@router.post("/seed")
-def seed_geo():
+def _fit(s: str, n: int = 255) -> str:
+    return (s or "")[:n]
+
+@router.post("/seed-regions")
+
+
+def seed_regions(dirPath: str = Query("/app/doc/")):
     with engine.begin() as conn:
-        # Insert continents
-        for c in SEED_CONTINENTS:
-            conn.execute(text("INSERT IGNORE INTO continents (name) VALUES (:name)"), {"name": c})
-        # Map continent names to ids
-        cont_rows = conn.execute(text("SELECT id, name FROM continents")).mappings().all()
-        cont_map = {r['name']: r['id'] for r in cont_rows}  # type: ignore
-        # Insert countries
-        for cont, countries in SEED_COUNTRIES.items():
-            cid = cont_map.get(cont)
-            if not cid:
+        # Clear existing data
+        conn.execute(text("DELETE FROM cities"))
+        conn.execute(text("DELETE FROM countries"))
+        conn.execute(text("DELETE FROM regions"))
+        # Insert regions from list
+        regions_map = {}
+        for rf in REGION_FILES:
+            name = rf.split(".")[0].capitalize() if rf != 'america.json' else 'America'
+            conn.execute(text("INSERT INTO regions (name) VALUES (:n)"), {"n": name})
+        rows = conn.execute(text("SELECT id,name FROM regions")).mappings().all()
+        regions_map = {r['name']: r['id'] for r in rows}
+
+        # For each region file, parse and insert countries/cities
+        for rf in os.listdir(dirPath):
+            if not rf.endswith('.csv'):
                 continue
-            for country in countries:
-                conn.execute(text("INSERT IGNORE INTO countries (continent_id, name) VALUES (:cid, :name)"), {"cid": cid, "name": country})
-        # Map country names to ids
-        rows = conn.execute(text("SELECT c.id as id, c.name as name FROM countries c")).mappings().all()
-        country_map = {r['name']: r['id'] for r in rows}  # type: ignore
-        # Insert capitals
-        for country, capital in SEED_CAPITALS.items():
-            cid = country_map.get(country)
-            if cid:
-                conn.execute(text("INSERT IGNORE INTO capitals (country_id, name) VALUES (:cid, :name)"), {"cid": cid, "name": capital})
+            region_name = rf.split(".")[0].capitalize() if rf != 'america.csv' else 'America'
+            rid = regions_map.get(region_name)
+            if not rid:
+                continue
+            path = os.path.join(dirPath, rf)
+            if not os.path.exists(path):
+                continue
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f, delimiter=';')
+                    debug_rows = []
+                    for i, row in enumerate(reader):
+                        if i < 5:
+                            debug_rows.append(dict(row))
+                        country_name = _fit(row.get('Country name EN') or row.get('country') or row.get('Country') or region_name)
+                        city_name = _fit(row.get('Name') or row.get('name'))
+                        if not country_name or not city_name:
+                            continue
+                        conn.execute(text("INSERT IGNORE INTO countries (region_id, name) VALUES (:rid, :n)"), {"rid": rid, "n": country_name})
+                        crow = conn.execute(text("SELECT id FROM countries WHERE region_id=:rid AND name=:n"), {"rid": rid, "n": country_name}).fetchone()
+                        if not crow:
+                            continue
+                        country_id = int(crow[0])
+                        conn.execute(text("INSERT IGNORE INTO cities (country_id, name, is_capital) VALUES (:cid, :n, 0)"), {"cid": country_id, "n": city_name})
+                    print(f"[DEBUG] First 5 rows from {rf}: {debug_rows}")
+            except Exception as e:
+                print(f"[ERROR] Failed to parse {rf}: {e}")
     return {"status": "seeded"}
 
-@router.get("/continents")
-def list_continents():
+
+@router.get("/regions")
+def list_regions():
     with engine.connect() as conn:
-        rows = conn.execute(text("SELECT name FROM continents ORDER BY name")).mappings().all()
-        return [r['name'] for r in rows]
+        rows = conn.execute(text("SELECT id, name FROM regions ORDER BY name")).mappings().all()
+        return [{"id": r['id'], "name": r['name']} for r in rows]
+
 
 @router.get("/countries")
-def list_countries(continent: str = Query(...)):
+def list_countries(region_id: int = Query(...)):
     with engine.connect() as conn:
-        rows = conn.execute(text("SELECT c.name FROM countries c JOIN continents ct ON ct.id = c.continent_id WHERE ct.name = :cont ORDER BY c.name"), {"cont": continent}).mappings().all()
-        return [r['name'] for r in rows]
+        rows = conn.execute(text("SELECT id, name FROM countries WHERE region_id = :rid ORDER BY name"), {"rid": region_id}).mappings().all()
+        return [{"id": r['id'], "name": r['name']} for r in rows]
 
-@router.get("/capitals")
-def list_capitals(country: str = Query(...)):
+
+@router.get("/cities")
+def list_cities(country_id: int = Query(...)):
     with engine.connect() as conn:
-        rows = conn.execute(text("SELECT cp.name FROM capitals cp JOIN countries c ON c.id = cp.country_id WHERE c.name = :country ORDER BY cp.name"), {"country": country}).mappings().all()
-        return [r['name'] for r in rows]
+        rows = conn.execute(text("SELECT id, name, is_capital FROM cities WHERE country_id = :cid ORDER BY is_capital DESC, name"), {"cid": country_id}).mappings().all()
+        return [{"id": r['id'], "name": r['name'], "is_capital": int(r['is_capital'])} for r in rows]
 
 @router.get("/dump")
 def dump_geo():
-    """Return all continents, countries, and capitals for debugging/wiring verification."""
     with engine.connect() as conn:
-        continents = conn.execute(text("SELECT id, name FROM continents ORDER BY name")).mappings().all()
-        countries = conn.execute(text("SELECT id, continent_id, name FROM countries ORDER BY name")).mappings().all()
-        capitals = conn.execute(text("SELECT id, country_id, name FROM capitals ORDER BY name")).mappings().all()
+        regions = conn.execute(text("SELECT id, name FROM regions ORDER BY name")).mappings().all()
+        countries = conn.execute(text("SELECT id, region_id, name FROM countries ORDER BY name")).mappings().all()
+        cities = conn.execute(text("SELECT id, country_id, name, is_capital FROM cities ORDER BY name")).mappings().all()
         return {
-            "continents": [{"id": c["id"], "name": c["name"]} for c in continents],
-            "countries": [{"id": c["id"], "continent_id": c["continent_id"], "name": c["name"]} for c in countries],
-            "capitals": [{"id": c["id"], "country_id": c["country_id"], "name": c["name"]} for c in capitals],
+            "regions": [{"id": r["id"], "name": r["name"]} for r in regions],
+            "countries": [{"id": c["id"], "region_id": c["region_id"], "name": c["name"]} for c in countries],
+            "cities": [{"id": c["id"], "country_id": c["country_id"], "name": c["name"], "is_capital": int(c["is_capital"]) } for c in cities],
         }

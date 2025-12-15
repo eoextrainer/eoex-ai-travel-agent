@@ -1,0 +1,18 @@
+AMADEUS:
+
+APP:                eoex-ai-travel-agent
+API Key:            5Npdl9jYmAgmArrQFCJOP973HP8JJkAb
+API Secret:         ZGLVANfLPXINFIJc
+Acess Token:        D1M8bc5oujvYhIoD9MnuSmFxYRGq
+    curl answer:
+        {
+            "type": "amadeusOAuth2Token",
+            "username": "educ1.eoex@gmail.com",
+            "application_name": "eoex-ai-travel-agent",
+            "client_id": "5Npdl9jYmAgmArrQFCJOP973HP8JJkAb",
+            "token_type": "Bearer",
+            "access_token": "D1M8bc5oujvYhIoD9MnuSmFxYRGq",
+            "expires_in": 1799,
+            "state": "approved",
+            "scope": ""
+        }

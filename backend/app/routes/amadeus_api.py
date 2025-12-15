@@ -15,9 +15,42 @@ logger.setLevel(logging.DEBUG)
 def get_client():
     client_id = os.getenv("AMADEUS_CLIENT_ID", "")
     client_secret = os.getenv("AMADEUS_CLIENT_SECRET", "")
+    host_env = os.getenv("AMADEUS_HOST", "test").lower()
+    host_param = None
+    if host_env in ("production", "prod"):
+        host_param = 'production'
     if not client_id or not client_secret:
         raise HTTPException(status_code=500, detail="Amadeus credentials not configured")
+    if host_param:
+        return Client(client_id=client_id, client_secret=client_secret, logger=logger, host=host_param)
     return Client(client_id=client_id, client_secret=client_secret, logger=logger)
+
+# Default origin airport handling (prefer verified CDG)
+DEFAULT_ORIGIN_IATA = None
+
+def get_default_origin_iata():
+    global DEFAULT_ORIGIN_IATA
+    if DEFAULT_ORIGIN_IATA:
+        return DEFAULT_ORIGIN_IATA
+    cached = get_cache("default_origin_iata", ttl=86400)
+    if cached:
+        DEFAULT_ORIGIN_IATA = cached
+        return DEFAULT_ORIGIN_IATA
+    amadeus = get_client()
+    iata = None
+    try:
+        resp = amadeus.reference_data.locations.get(keyword="CDG", subType="AIRPORT")
+        data = resp.data if isinstance(resp.data, list) else []
+        for item in data:
+            code = item.get("iataCode") or (item.get("address") or {}).get("iataCode")
+            if code == "CDG":
+                iata = "CDG"
+                break
+    except ResponseError:
+        iata = None
+    DEFAULT_ORIGIN_IATA = iata or "CDG"
+    set_cache("default_origin_iata", DEFAULT_ORIGIN_IATA)
+    return DEFAULT_ORIGIN_IATA
 
 def _raise_http_error(error: ResponseError):
     detail = getattr(error, 'response', None)
@@ -58,7 +91,7 @@ def health():
 
 @router.get("/test")
 def test_api(
-    origin: str = Query("MAD"),
+    origin: str = Query("CDG"),
     destination: str = Query("ATH"),
     departure: str = Query("2026-01-15"),
     adults: int = Query(1),
@@ -106,7 +139,7 @@ def locations(keyword: str = Query("Athens"), subType: str = Query("CITY")):
     return response.data if isinstance(response.data, list) else [response.data]
 
 @router.get("/flight-destinations")
-def flight_destinations(origin: str = Query("MAD")):
+def flight_destinations(origin: str = Query("CDG")):
     amadeus = get_client()
     cache_key = f"flight_destinations_{origin}"
     cached = get_cache(cache_key)
@@ -119,7 +152,7 @@ def flight_destinations(origin: str = Query("MAD")):
     return response.data if isinstance(response.data, list) else [response.data]
 
 @router.get("/flight-dates")
-def flight_dates(origin: str = Query("MAD"), destination: str = Query("MUC")):
+def flight_dates(origin: str = Query("CDG"), destination: str = Query("MUC")):
     amadeus = get_client()
     cache_key = f"flight_dates_{origin}_{destination}"
     cached = get_cache(cache_key)
@@ -146,7 +179,7 @@ def hotel_offers(hotelIds: str = Query("ADPAR001"), adults: int = Query(2)):
 
 @router.post("/seed-from-flight-offers")
 def seed_from_flight_offers(
-    origin: str = Query("MAD"),
+    origin: str = Query("CDG"),
     destination: str = Query("ATH"),
     departure: str = Query("2026-01-15"),
     adults: int = Query(1),
@@ -349,30 +382,99 @@ def activities_by_square(north: float = Query(41.397158), west: float = Query(2.
     return response.data if isinstance(response.data, list) else [response.data]
 
 @router.get("/flight-offers-by-cities")
-def flight_offers_by_cities(originCity: str = Query("Paris"), destinationCity: str = Query("Athens"), departure: str = Query("2026-01-15"), adults: int = Query(1)):
+def flight_offers_by_cities(
+    originCity: str = Query("Paris"),
+    destinationCity: str = Query("Athens"),
+    departure: str = Query("2026-01-15"),
+    adults: int = Query(1),
+    includeMeta: bool = Query(False),
+):
     amadeus = get_client()
-    # Resolve airport codes for origin and destination cities
-    try:
-        orig = retry_call(lambda: amadeus.reference_data.locations.airports.get(longitude=2.3522, latitude=48.8566))
-        # Fallback: use locations search by keyword
-        if not isinstance(orig.data, list) or not orig.data:
-            orig = retry_call(lambda: amadeus.reference_data.locations.get(keyword=originCity, subType="AIRPORT"))
-        dest = retry_call(lambda: amadeus.reference_data.locations.get(keyword=destinationCity, subType="AIRPORT"))
-    except ResponseError as e:
-        _raise_http_error(e)
-    def pick_iata(lst):
-        if isinstance(lst, list) and lst:
-            first = lst[0]
-            return (first.get('iataCode') or first.get('iata_code') or first.get('address', {}).get('iataCode'))
-        return None
-    origin_iata = pick_iata(orig.data)
-    dest_iata = pick_iata(dest.data)
-    if not origin_iata or not dest_iata:
-        raise HTTPException(status_code=400, detail="Could not resolve airport codes for cities")
-    resp = retry_call(lambda: amadeus.shopping.flight_offers_search.get(
-        originLocationCode=origin_iata,
-        destinationLocationCode=dest_iata,
-        departureDate=departure,
-        adults=adults,
-    ))
-    return resp.data if isinstance(resp.data, list) else [resp.data]
+    # Resolve IATA codes from city names: prefer CITY code, also gather AIRPORT codes for fallback
+    def resolve_codes(city_name: str):
+        city_code = None
+        airport_codes = []
+        try:
+            resp_city = amadeus.reference_data.locations.cities.get(keyword=city_name)
+            data_city = resp_city.data if isinstance(resp_city.data, list) else []
+            if data_city:
+                city_code = data_city[0].get('iataCode')
+        except ResponseError:
+            pass
+        try:
+            resp_air = amadeus.reference_data.locations.get(keyword=city_name, subType="AIRPORT")
+            data_air = resp_air.data if isinstance(resp_air.data, list) else []
+            for item in data_air:
+                code = item.get('iataCode') or (item.get('address') or {}).get('iataCode')
+                if code:
+                    airport_codes.append(code)
+        except ResponseError:
+            pass
+        return city_code, airport_codes
+
+    def try_offers(o_code: str, d_code: str, date_str: str):
+        def do_get():
+            return amadeus.shopping.flight_offers_search.get(
+                originLocationCode=o_code,
+                destinationLocationCode=d_code,
+                departureDate=date_str,
+                adults=adults,
+            )
+        try:
+            resp = retry_call(do_get, max_retries=2, backoff_sec=0.6)
+            return resp.data if isinstance(resp.data, list) else []
+        except HTTPException:
+            return []
+
+    def suggested_dates(o_code: str, d_code: str):
+        try:
+            resp = retry_call(lambda: amadeus.shopping.flight_dates.get(origin=o_code, destination=d_code), max_retries=2, backoff_sec=0.6)
+            arr = resp.data if isinstance(resp.data, list) else []
+            out = []
+            for item in arr:
+                d = item.get('departureDate') or item.get('date')
+                if isinstance(d, str):
+                    out.append(d)
+            return out
+        except HTTPException:
+            return []
+
+    origin_city_code, origin_airports = resolve_codes(originCity)
+    dest_city_code, dest_airports = resolve_codes(destinationCity)
+
+    # Build attempt pairs: city→city, airport→airport (first), airport combos
+    attempts = []
+    if origin_city_code and dest_city_code:
+        attempts.append((origin_city_code, dest_city_code))
+    if origin_airports and dest_airports:
+        attempts.append((origin_airports[0], dest_airports[0]))
+    if origin_city_code and dest_airports:
+        attempts.append((origin_city_code, dest_airports[0]))
+    if origin_airports and dest_city_code:
+        attempts.append((origin_airports[0], dest_city_code))
+
+    # First try requested date
+    for o_code, d_code in attempts:
+        data = try_offers(o_code, d_code, departure)
+        if data:
+            return ({"data": data, "meta": {"origin": o_code, "dest": d_code, "date": departure, "fallback": False}} if includeMeta else data)
+
+    # Fallback to suggested dates near requested
+    for o_code, d_code in attempts:
+        dates = suggested_dates(o_code, d_code)
+        if not dates:
+            continue
+        # sort by proximity to requested
+        try:
+            from datetime import datetime
+            req_dt = datetime.strptime(departure, "%Y-%m-%d")
+            dates = sorted(dates, key=lambda s: abs((datetime.strptime(s, "%Y-%m-%d") - req_dt).days))
+        except Exception:
+            pass
+        for d in dates[:3]:
+            data = try_offers(o_code, d_code, d)
+            if data:
+                return ({"data": data, "meta": {"origin": o_code, "dest": d_code, "date": d, "fallback": True}} if includeMeta else data)
+
+    # If all attempts failed or returned empty, surface empty list for UX
+    return ({"data": [], "meta": {"origin": attempts[0][0] if attempts else None, "dest": attempts[0][1] if attempts else None, "date": departure, "fallback": True}} if includeMeta else [])

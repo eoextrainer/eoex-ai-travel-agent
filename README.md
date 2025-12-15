@@ -14,7 +14,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 export AMADEUS_CLIENT_ID="<your_client_id>"
 export AMADEUS_CLIENT_SECRET="<your_client_secret>"
-uvicorn backend.app.main:app --reload --port 8000
+uvicorn backend.app.main:app --reload --port 2000
 ```
 Optional `.env` at repo root is supported and auto-loaded by the backend:
 
@@ -29,22 +29,22 @@ CACHE_DEFAULT_TTL=600
 ```
 
 ## Serve Frontend
-Visit `http://localhost:8000/index.html` to load the frontend via FastAPI static files.
+Visit `http://localhost:2000/index.html` to load the frontend via FastAPI static files.
 
 ## Geo Data Seeding & Verification
 
 Seed and inspect continents, countries, and capitals:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8000/api/geo/seed
-curl -s http://127.0.0.1:8000/api/geo/dump | jq '.counts,.continents,.countries[:10],.capitals[:10]'
+curl -s -X POST http://127.0.0.1:2000/api/geo/seed
+curl -s http://127.0.0.1:2000/api/geo/dump | jq '.counts,.continents,.countries[:10],.capitals[:10]'
 ```
 
 On the homepage, a "Backend Data Snapshot" card will display a small preview fetched from `/api/geo/dump` to validate frontend-backend wiring.
 
 ## Codespaces
 - Open the repo in GitHub Codespaces; `.devcontainer/devcontainer.json` will install dependencies.
-- Run `uvicorn backend.app.main:app --host 0.0.0.0 --port 8000`.
+- Run `uvicorn backend.app.main:app --host 0.0.0.0 --port 2000`.
 
 ## Local Project Setup
 
@@ -78,7 +78,13 @@ bash backend/scripts/init_db.sh
 - Start backend
 
 ```bash
-python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 2000
+```
+
+Or use the launcher script (reads `APP_PORT`, defaults to `2000`):
+
+```bash
+bash scripts/run.sh
 ```
 
 ## Docker Hub Publishing
@@ -151,20 +157,20 @@ PY
 ## Warm Cache and Seed Data
 
 ```bash
-curl -s "http://127.0.0.1:8000/api/amadeus/locations?keyword=Athens&subType=CITY" >/dev/null
-curl -s "http://127.0.0.1:8000/api/amadeus/hotel-offers?hotelIds=ADPAR001&adults=2" >/dev/null
-curl -s "http://127.0.0.1:8000/api/amadeus/activities-by-geo?latitude=37.9838&longitude=23.7275" >/dev/null
+curl -s "http://127.0.0.1:2000/api/amadeus/locations?keyword=Athens&subType=CITY" >/dev/null
+curl -s "http://127.0.0.1:2000/api/amadeus/hotel-offers?hotelIds=ADPAR001&adults=2" >/dev/null
+curl -s "http://127.0.0.1:2000/api/amadeus/activities-by-geo?latitude=37.9838&longitude=23.7275" >/dev/null
 
-curl -s -X POST "http://127.0.0.1:8000/api/amadeus/seed-from-flight-offers?origin=MAD&destination=ATH&departure=2026-01-15&adults=1&user_id=1&budget=2000.0"
+curl -s -X POST "http://127.0.0.1:2000/api/amadeus/seed-from-flight-offers?origin=MAD&destination=ATH&departure=2026-01-15&adults=1&user_id=1&budget=2000.0"
 
-curl -s -X POST http://127.0.0.1:8000/api/journeys/seed -H 'Content-Type: application/json' -d '{"user_id":1,"destination_country":"Greece","destination_city":"Athens","budget":2000.0,"flights":[{"airline":"BA","origin_city":"MAD","destination_city":"ATH","departure_date":"2026-01-15","arrival_date":"2026-01-15","price":250.00}],"accommodations":[{"name":"Hotel Athens","address":"1 Main St","city":"Athens","price_per_night":120.00}]}'
+curl -s -X POST http://127.0.0.1:2000/api/journeys/seed -H 'Content-Type: application/json' -d '{"user_id":1,"destination_country":"Greece","destination_city":"Athens","budget":2000.0,"flights":[{"airline":"BA","origin_city":"MAD","destination_city":"ATH","departure_date":"2026-01-15","arrival_date":"2026-01-15","price":250.00}],"accommodations":[{"name":"Hotel Athens","address":"1 Main St","city":"Athens","price_per_night":120.00}]}'
 ```
 
 ## Verify Data
 
 ```bash
-curl -s http://127.0.0.1:8000/api/journeys | jq
-curl -s "http://127.0.0.1:8000/api/admin/dashboard?user=traveler-1&destination=Athens&budget=2500" | jq
+curl -s http://127.0.0.1:2000/api/journeys | jq
+curl -s "http://127.0.0.1:2000/api/admin/dashboard?user=traveler-1&destination=Athens&budget=2500" | jq
 ```
 
 >>>>>>> a3c6fae (feat(geo): add continents/countries/capitals tables, seed and list endpoints; standardize list responses; premium UI with backend-fed dropdowns; auto-seed on startup; tests and docs updates)
